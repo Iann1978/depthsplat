@@ -1,3 +1,4 @@
+# Table 1 of depthsplat paper
 CUDA_VISIBLE_DEVICES=0 python -m src.main +experiment=re10k \
 dataset.test_chunk_interval=1 \
 model.encoder.num_scales=2 \
