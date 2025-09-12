@@ -7,7 +7,7 @@ from ..dataset import Dataset, DatasetRE10kCfg
 from ..dataset import get_dataset
 from .context_provider import ContextProvider, ContextProviderCfgCommon
 from ..dataset import DatasetCfg
-from ..dataset.types import BatchedViews
+from ..dataset.types import BatchedViews, UnbatchedViews
 from omegaconf import DictConfig, OmegaConf
 import hydra
 from src.config import load_typed_config
@@ -32,8 +32,18 @@ class DatasetContextProvider(ContextProvider):
 
     def get_context(self) -> BatchedViews:
         context = next(self.dataset_iterator)["context"]
+        context = self.toBatchedViews(context)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         return self.to_device(context, device)
+    
+    def toBatchedViews(self, context: UnbatchedViews) -> BatchedViews:
+        return BatchedViews(
+            extrinsics=context["extrinsics"].unsqueeze(0),
+            intrinsics=context["intrinsics"].unsqueeze(0),
+            image=context["image"].unsqueeze(0),
+            near=context["near"].unsqueeze(0),
+            far=context["far"].unsqueeze(0)
+        )
 
 @hydra.main(config_path="../../config/dataset", config_name="re10k", version_base=None)
 def test_dataset_context_provider(cfg_dict: DictConfig):
