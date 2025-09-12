@@ -4,7 +4,7 @@ from typing import Literal
 import torch
 
 from ..dataset.types import BatchedViews
-from .context_provider import ContextProvider, ContextProviderCfgCommon
+from .context_provider import ContextProvider, ContextProviderCfgCommon, debug_output_context
 
 @dataclass
 class RandomContextProviderCfg(ContextProviderCfgCommon):
@@ -21,14 +21,16 @@ class RandomContextProvider(ContextProvider):
 
     def get_context(self) -> BatchedViews:
         b, v, h, w = 1, self.cfg.num_views, self.cfg.image_shape[0], self.cfg.image_shape[1]
-        return BatchedViews(
+        context = BatchedViews(
             extrinsics=torch.randn(b, v, 4, 4),
             intrinsics=torch.randn(b, v, 3, 3),
             image=torch.randn(b, v, 3, h, w),
             near=torch.randn(b, v),
             far=torch.randn(b, v)
         )
-
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        return self.to_device(context, device)
+        
 def test_random_context_provider():
     cfg = RandomContextProviderCfg(
         name="random",
@@ -37,11 +39,7 @@ def test_random_context_provider():
     )
     provider = RandomContextProvider(cfg)
     context = provider.get_context()
-    print('extrinsics shape: ', context["extrinsics"].shape)
-    print('intrinsics shape: ', context["intrinsics"].shape)
-    print('image shape: ', context["image"].shape)
-    print('near shape: ', context["near"].shape)
-    print('far shape: ', context["far"].shape)
+    debug_output_context(context)
 
 if __name__ == "__main__":
     test_random_context_provider()

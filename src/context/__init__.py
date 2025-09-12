@@ -1,5 +1,5 @@
 from .random_context_provider import RandomContextProvider, RandomContextProviderCfg
-from .context_provider import ContextProvider
+from .context_provider import ContextProvider, debug_output_context
 
 CONTEXT_PROVIDERS: dict[str, ContextProvider] = {
     "random": RandomContextProvider,
