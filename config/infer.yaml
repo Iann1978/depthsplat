@@ -1,6 +1,11 @@
+defaults:
+  - model/encoder: depthsplat
+  - model/decoder: splatting_cuda
+
 type: infer
 
 context_provider:
   name: random
   num_views: 2
   image_shape: [256, 256]
+
