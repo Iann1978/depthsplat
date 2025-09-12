@@ -46,3 +46,11 @@ class Decoder(nn.Module, ABC, Generic[T]):
         depth_mode: DepthRenderingMode | None = None,
     ) -> DecoderOutput:
         pass
+
+def debug_output_decoder_output(output: DecoderOutput):
+    print('-'*100)
+    print('color shape: ', output.color.shape)
+    print('depth shape: ', output.depth.shape if output.depth is not None else 'None')
+    print('color device: ', output.color.device)
+    print('depth device: ', output.depth.device if output.depth is not None else 'None')
+    print('-'*100)

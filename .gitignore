@@ -166,3 +166,6 @@ pretrained
 outputs
 output
 checkpoints
+color256.jpg
+context_image0.jpg
+context_image1.jpg

@@ -1,6 +1,7 @@
 from ...dataset import DatasetCfg
 from .decoder import Decoder
 from .decoder_splatting_cuda import DecoderSplattingCUDA, DecoderSplattingCUDACfg
+from .decoder import debug_output_decoder_output
 
 DECODERS = {
     "splatting_cuda": DecoderSplattingCUDA,

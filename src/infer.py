@@ -9,9 +9,11 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from src.config import load_typed_config
 from src.context import ContextProviderCfg, get_context_provider, debug_output_context
+from src.model.decoder import get_decoder, debug_output_decoder_output
 from src.model.encoder import get_encoder
 from src.config import EncoderCfg, ModelCfg
 from src.model.types import debug_output_gaussians
+from src.misc.image_io import save_image
 
 
 @dataclass
@@ -43,17 +45,62 @@ def infer(cfg_dict: DictConfig):
     print(encoder)
     print(encoder_visualizer)
 
+    print("get decoder")
+    decoder = get_decoder(cfg.model.decoder, cfg.context_provider.dataset)
+    decoder.eval()
+    decoder.cuda()
+    print(decoder)
+
     context = context_provider.get_context()
     debug_output_context(context)
+    save_image(context["image"][0, 0], 'context_image0.jpg')
+    save_image(context["image"][0, 1], 'context_image1.jpg')
+    print("Saved context images to context_image0.jpg and context_image1.jpg")
+
 
     gaussians = encoder(context, 0, False)["gaussians"]
     debug_output_gaussians(gaussians)
+    
+    # Clear cache after encoder
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        print(f"GPU memory after encoder: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
+
+    # Use smaller image size to reduce memory usage
+    image_shape = (256, 256)  # Reduced from (256, 256)
+    print(f"Using image shape: {image_shape}")
+    
+    # Option to skip depth rendering if memory is tight
+    render_depth = False  # Set to False if you want to skip depth rendering
+    depth_mode = "depth" if render_depth else None
+    print(f"Depth rendering: {'enabled' if render_depth else 'disabled'}")
+    
+    output = decoder(gaussians, context["extrinsics"], context["intrinsics"], context["near"], context["far"], image_shape, depth_mode=depth_mode)
+    debug_output_decoder_output(output)
+    
+    # Clear cache after decoder
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        print(f"GPU memory after decoder: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
+
+    save_image(output.color[0, 0], 'color256.jpg')
+    print("Saved rendered color to color256.jpg")
 
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
 
-
+    # Memory optimization settings
     torch.set_float32_matmul_precision('high')
+    
+    # Set environment variable for better memory management
+    import os
+    os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+    
+    # Clear GPU cache before starting
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        print(f"GPU memory before: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
+        print(f"GPU memory reserved: {torch.cuda.memory_reserved() / 1024**3:.2f} GB")
 
     infer()
