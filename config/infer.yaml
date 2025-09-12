@@ -1,11 +1,13 @@
 defaults:
+  - dataset: re10k
   - model/encoder: depthsplat
   - model/decoder: splatting_cuda
 
 type: infer
 
 context_provider:
-  name: random
-  num_views: 2
+  name: dataset
+  dataset:
+    <<: ${dataset}
   image_shape: [256, 256]
 
