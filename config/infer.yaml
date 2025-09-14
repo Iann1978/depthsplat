@@ -1,5 +1,5 @@
 defaults:
-  - context_provider: dataset
+  - context_provider: images
   - model/encoder: depthsplat
   - model/decoder: splatting_cuda
 
@@ -18,13 +18,3 @@ model:
 
 
     
-# dataset: 
-#   image_shape: [256, 256]
-#   roots: [datasets/re10k]
-#   near: 0.5
-#   far: 100.
-#   baseline_scale_bounds: false
-#   make_baseline_1: false
-#   train_times_per_scene: 1
-#   highres: false
-

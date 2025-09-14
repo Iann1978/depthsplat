@@ -89,24 +89,40 @@ class ImagesContextProvider(ContextProvider):
     
     def get_context(self) -> BatchedViews:
         b, v = 1, 2
+        
+        # Resize images to reduce memory usage
+        target_height, target_width = self.cfg.image_shape  # [240, 320]
+        frame0_resized = cv2.resize(self.frame0, (target_width, target_height))
+        frame1_resized = cv2.resize(self.frame1, (target_width, target_height))
+        
         # Convert numpy arrays to PyTorch tensors
-        frame0_tensor = torch.from_numpy(self.frame0).float()
-        frame1_tensor = torch.from_numpy(self.frame1).float()
+        frame0_tensor = torch.from_numpy(frame0_resized).float()
+        frame1_tensor = torch.from_numpy(frame1_resized).float()
         image = torch.stack([frame0_tensor, frame1_tensor], dim=0)
         image = image.permute(0, 3, 1, 2)
         image = image.unsqueeze(0)
         image = image/255.0
         print("image's min, max", image.min(), image.max())
+        print(f"Resized images to: {target_height}x{target_width}")
 
         # Convert camera intrinsics from numpy to PyTorch tensors
-        w,h = 320*2, 240*2
+        # Scale intrinsics to match resized images
+        original_height, original_width = self.frame0.shape[:2]  # Original image size
+        scale_x = target_width / original_width
+        scale_y = target_height / original_height
+        
         K0_tensor = torch.from_numpy(self.K0).float()
-        K0_tensor[0] = K0_tensor[0] / w
-        K0_tensor[1] = K0_tensor[1] / h
+        K0_tensor[0, 0] *= scale_x  # fx
+        K0_tensor[1, 1] *= scale_y  # fy
+        K0_tensor[0, 2] *= scale_x  # cx
+        K0_tensor[1, 2] *= scale_y  # cy
         print('K0_tensor', K0_tensor)
+        
         K1_tensor = torch.from_numpy(self.K1).float()
-        K1_tensor[0] = K1_tensor[0] / w
-        K1_tensor[1] = K1_tensor[1] / h
+        K1_tensor[0, 0] *= scale_x  # fx
+        K1_tensor[1, 1] *= scale_y  # fy
+        K1_tensor[0, 2] *= scale_x  # cx
+        K1_tensor[1, 2] *= scale_y  # cy
         print('K1_tensor', K1_tensor)
         intrinsics = torch.stack([K0_tensor, K1_tensor], dim=0)
         intrinsics = intrinsics.unsqueeze(0)

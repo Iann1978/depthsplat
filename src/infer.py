@@ -75,7 +75,8 @@ def infer(cfg_dict: DictConfig):
 
     print("")
     print("get decoder")
-    decoder = get_decoder(cfg.model.decoder, cfg.context_provider.dataset)
+    background_color = [0.0, 0.0, 0.0]
+    decoder = get_decoder(cfg.model.decoder, background_color)
     decoder.eval()
     decoder.cuda()
     # print(decoder)
@@ -92,6 +93,19 @@ def infer(cfg_dict: DictConfig):
 
     print("")
     print("encoding gaussians")
+    
+    # Move context data to GPU before passing to encoder
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    context = {
+        "extrinsics": context["extrinsics"].to(device),
+        "intrinsics": context["intrinsics"].to(device),
+        "image": context["image"].to(device),
+        "near": context["near"].to(device),
+        "far": context["far"].to(device),
+        "index": context["index"].to(device),
+    }
+    print(f"Moved context data to device: {device}")
+    
     gaussians = encoder(context, 0, False)["gaussians"]
     # debug_output_gaussians(gaussians)
     
@@ -140,5 +154,9 @@ if __name__ == "__main__":
         torch.cuda.empty_cache()
         print(f"GPU memory before: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
         print(f"GPU memory reserved: {torch.cuda.memory_reserved() / 1024**3:.2f} GB")
+        
+        # Force garbage collection
+        import gc
+        gc.collect()
 
     infer()

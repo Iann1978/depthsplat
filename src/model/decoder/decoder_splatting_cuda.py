@@ -23,12 +23,12 @@ class DecoderSplattingCUDA(Decoder[DecoderSplattingCUDACfg]):
     def __init__(
         self,
         cfg: DecoderSplattingCUDACfg,
-        dataset_cfg: DatasetCfg,
+        background_color: list[float]
     ) -> None:
-        super().__init__(cfg, dataset_cfg)
+        super().__init__(cfg, background_color)
         self.register_buffer(
             "background_color",
-            torch.tensor(dataset_cfg.background_color, dtype=torch.float32),
+            torch.tensor(background_color, dtype=torch.float32),
             persistent=False,
         )
 
