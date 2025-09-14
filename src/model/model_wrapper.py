@@ -359,6 +359,8 @@ class ModelWrapper(LightningModule):
         return total_loss
 
     def test_step(self, batch, batch_idx):
+        save_image(batch["context"]["image"][0,0], "context_image0.jpg")
+        save_image(batch["context"]["image"][0,1], "context_image1.jpg")
         batch: BatchedExample = self.data_shim(batch)
         b, v, _, h, w = batch["target"]["image"].shape
         assert b == 1
@@ -527,6 +529,9 @@ class ModelWrapper(LightningModule):
 
         images_prob = output.color[0]
         rgb_gt = batch["target"]["image"][0]
+        # save_image(rgb_gt[0], "rgb_gt.jpg")
+        save_image(images_prob[0], "color256.jpg")
+        exit()
 
         # Save images.
         if self.test_cfg.save_image:

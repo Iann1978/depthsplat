@@ -12,7 +12,7 @@ context_provider:
     roots: [datasets/re10k]
     make_baseline_1: false
     augment: true
-    image_shape: [480, 640]
+    image_shape: [180, 320]
     background_color: [0.0, 0.0, 0.0]
     cameras_are_circular: false
     overfit_to_scene: null
@@ -36,5 +36,25 @@ context_provider:
       warm_up_steps: 0
       initial_min_distance_between_context_views: 2
       initial_max_distance_between_context_views: 6
+  image_shape: [180, 320]
+
+model:
+  encoder:
+    monodepth_vit_type: vitl
+    num_scales: 2
+    upsample_factor: 2
+    lowest_feature_resolution: 4
+
+
+
+    
+dataset: 
   image_shape: [256, 256]
+  roots: [datasets/re10k]
+  near: 0.5
+  far: 100.
+  baseline_scale_bounds: false
+  make_baseline_1: false
+  train_times_per_scene: 1
+  highres: false
 

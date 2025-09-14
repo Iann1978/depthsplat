@@ -48,3 +48,12 @@ DataShim = Callable[[BatchedExample], BatchedExample]
 
 AnyExample = BatchedExample | UnbatchedExample
 AnyViews = BatchedViews | UnbatchedViews
+
+
+def debug_output_sample(sample: AnyExample):
+    print('-'*100)
+    print('target shape: ', sample["target"]["image"].shape)
+    print('context shape: ', sample["context"]["image"].shape)
+    print('target device: ', sample["target"]["image"].device)
+    print('context device: ', sample["context"]["image"].device)
+    print('-'*100)

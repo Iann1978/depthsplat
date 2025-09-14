@@ -27,7 +27,7 @@ class DatasetContextProvider(ContextProvider):
 
     def __init__(self, cfg: DatasetContextProviderCfg) -> None:
         self.cfg = cfg
-        self.dataset = get_dataset(cfg.dataset, "train", None)
+        self.dataset = get_dataset(cfg.dataset, "test", None)
         self.dataset_iterator = iter(self.dataset)
 
     def get_context(self) -> BatchedViews:

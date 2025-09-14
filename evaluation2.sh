@@ -1,5 +1,5 @@
 # Table 1 of depthsplat paper
-CUDA_VISIBLE_DEVICES=0 python -m src.infer2 +experiment=re10k \
+CUDA_VISIBLE_DEVICES=0 python -m src.infer2 +experiment=re10k_tmp \
 dataset.test_chunk_interval=1 \
 model.encoder.num_scales=2 \
 model.encoder.upsample_factor=2 \

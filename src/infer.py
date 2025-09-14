@@ -14,6 +14,14 @@ from src.model.encoder import get_encoder
 from src.config import EncoderCfg, ModelCfg
 from src.model.types import debug_output_gaussians
 from src.misc.image_io import save_image
+from colorama import Fore
+from torch.utils.data import DataLoader
+from src.dataset.data_module import get_dataset, worker_init_fn
+from src.dataset.types import debug_output_sample
+from src.dataset import DatasetCfg
+
+def cyan(text: str) -> str:
+    return f"{Fore.CYAN}{text}{Fore.RESET}"
 
 
 @dataclass
@@ -21,6 +29,7 @@ class InferCfg:
     type: Literal["infer"]
     context_provider: ContextProviderCfg
     model: ModelCfg
+    dataset: DatasetCfg 
 
 @hydra.main(
     version_base=None,
@@ -30,6 +39,7 @@ class InferCfg:
 def infer(cfg_dict: DictConfig):
     print("infer")
     print(OmegaConf.to_yaml(cfg_dict))
+    # exit()
 
     cfg = load_typed_config(cfg_dict, InferCfg)
     print(cfg)
@@ -39,7 +49,25 @@ def infer(cfg_dict: DictConfig):
     print(context_provider)
 
     print("get encoder")
+    print('cfg.model.encoder', cfg.model.encoder)
     encoder, encoder_visualizer = get_encoder(cfg.model.encoder)
+    pretrained_model = torch.load('pretrained/depthsplat-gs-large-re10k-256x256-view2-e0f0f27a.pth', map_location='cpu')
+    if 'state_dict' in pretrained_model:
+        pretrained_model = pretrained_model['state_dict']
+    
+    # Extract encoder weights by removing "encoder." prefix
+    encoder_weights = {}
+    for key, value in pretrained_model.items():
+        if key.startswith("encoder."):
+            encoder_key = key[8:]  # Remove "encoder." prefix
+            encoder_weights[encoder_key] = value
+    
+    encoder.load_state_dict(encoder_weights)
+    print(
+        cyan(
+            f"Loaded pretrained weights: pretrained/depthsplat-gs-large-re10k-256x256-view2-e0f0f27a.pth"
+        )
+    )
     encoder.eval()
     encoder.cuda()
     print(encoder)
@@ -51,13 +79,39 @@ def infer(cfg_dict: DictConfig):
     decoder.cuda()
     print(decoder)
 
-    context = context_provider.get_context()
+    dataset = get_dataset(
+        cfg.dataset,
+        "test",
+        None,
+    )
+    # dataset = data_module.dataset_shim(dataset, "test")
+    loader = DataLoader(
+        dataset,
+        1,
+        # num_workers=cfg.data_loader.test.num_workers,
+        # generator=data_module.get_generator(cfg.data_loader.test),
+        # worker_init_fn=worker_init_fn,
+        # persistent_workers=data_module.get_persistent(cfg.data_loader.test),
+        shuffle=False,
+    )
+
+    sample = next(iter(loader))
+    debug_output_sample(sample) 
+    context = sample["context"]
+    context["image"] = context["image"].cuda()
+    context["extrinsics"] = context["extrinsics"].cuda()
+    context["intrinsics"] = context["intrinsics"].cuda()
+    context["near"] = context["near"].cuda()
+    context["far"] = context["far"].cuda()
+
+    # context = context_provider.get_context()
     debug_output_context(context)
     save_image(context["image"][0, 0], 'context_image0.jpg')
     save_image(context["image"][0, 1], 'context_image1.jpg')
     print("Saved context images to context_image0.jpg and context_image1.jpg")
 
 
+    print(cyan("encoding gaussians"))
     gaussians = encoder(context, 0, False)["gaussians"]
     debug_output_gaussians(gaussians)
     
