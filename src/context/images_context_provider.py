@@ -108,8 +108,8 @@ class ImagesContextProvider(ContextProvider):
         # Convert camera intrinsics from numpy to PyTorch tensors
         # Scale intrinsics to match resized images
         original_height, original_width = self.frame0.shape[:2]  # Original image size
-        scale_x = target_width / original_width
-        scale_y = target_height / original_height
+        scale_x = 1 / original_width
+        scale_y = 1 / original_height
         
         K0_tensor = torch.from_numpy(self.K0).float()
         K0_tensor[0, 0] *= scale_x  # fx
