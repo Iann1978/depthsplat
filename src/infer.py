@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Literal
 import warnings
 import torch
+from pathlib import Path
 warnings.filterwarnings("ignore", message=".*torch.library.impl_abstract.*", category=FutureWarning)
 
 import hydra
@@ -23,6 +24,18 @@ from src.dataset import DatasetCfg
 def cyan(text: str) -> str:
     return f"{Fore.CYAN}{text}{Fore.RESET}"
 
+def load_encoder_from_pretrained(encoder, pretrained_model):
+    if isinstance(pretrained_model, str) or isinstance(pretrained_model, Path):
+        pretrained_model = torch.load(str(pretrained_model), map_location='cpu')
+    if 'state_dict' in pretrained_model:
+        pretrained_model = pretrained_model['state_dict']
+    encoder_weights = {}
+    for key, value in pretrained_model.items():
+        if key.startswith("encoder."):
+            encoder_key = key[8:]  # Remove "encoder." prefix
+            encoder_weights[encoder_key] = value
+    encoder.load_state_dict(encoder_weights)
+    return encoder
 
 @dataclass
 class InferCfg:
@@ -37,50 +50,39 @@ class InferCfg:
     config_name="infer",
 )
 def infer(cfg_dict: DictConfig):
-    print("--------------------------------infer--------------------------")
+    print("infer")
     # print(OmegaConf.to_yaml(cfg_dict))
     # exit()
 
     cfg = load_typed_config(cfg_dict, InferCfg)
     # print(cfg)
 
-    print("--------------------------------get context provider--------------------------------")
+    print("")
+    print("get context provider")
     context_provider = get_context_provider(cfg.context_provider)
     # print(context_provider)
 
-    print("--------------------------------get encoder--------------------------------")
+    print("")
+    print("get encoder")
     # print('cfg.model.encoder', cfg.model.encoder)
     encoder, encoder_visualizer = get_encoder(cfg.model.encoder)
-    pretrained_model = torch.load('pretrained/depthsplat-gs-large-re10k-256x256-view2-e0f0f27a.pth', map_location='cpu')
-    if 'state_dict' in pretrained_model:
-        pretrained_model = pretrained_model['state_dict']
-    
-    # Extract encoder weights by removing "encoder." prefix
-    encoder_weights = {}
-    for key, value in pretrained_model.items():
-        if key.startswith("encoder."):
-            encoder_key = key[8:]  # Remove "encoder." prefix
-            encoder_weights[encoder_key] = value
-    
-    encoder.load_state_dict(encoder_weights)
-    print(
-        cyan(
-            f"Loaded pretrained weights: pretrained/depthsplat-gs-large-re10k-256x256-view2-e0f0f27a.pth"
-        )
-    )
+    encoder = load_encoder_from_pretrained(encoder, 'pretrained/depthsplat-gs-large-re10k-256x256-view2-e0f0f27a.pth')
+    print(cyan(f"Loaded pretrained weights: pretrained/depthsplat-gs-large-re10k-256x256-view2-e0f0f27a.pth"))
     encoder.eval()
     encoder.cuda()
     # print(encoder)
     # print(encoder_visualizer)
 
-    print("--------------------------------get decoder--------------------------------")
+    print("")
+    print("get decoder")
     decoder = get_decoder(cfg.model.decoder, cfg.context_provider.dataset)
     decoder.eval()
     decoder.cuda()
     # print(decoder)
 
 
-    print("--------------------------------get context--------------------------------")
+    print("")
+    print("get context")
     context = context_provider.get_context()
     debug_output_context(context)
     save_image(context["image"][0, 0], 'context_image0.jpg')
@@ -88,9 +90,10 @@ def infer(cfg_dict: DictConfig):
     print("Saved context images to context_image0.jpg and context_image1.jpg")
 
 
-    print("--------------------------------encoding gaussians--------------------------------")
+    print("")
+    print("encoding gaussians")
     gaussians = encoder(context, 0, False)["gaussians"]
-    debug_output_gaussians(gaussians)
+    # debug_output_gaussians(gaussians)
     
     # Clear cache after encoder
     if torch.cuda.is_available():
@@ -106,16 +109,18 @@ def infer(cfg_dict: DictConfig):
     depth_mode = "depth" if render_depth else None
     print(f"Depth rendering: {'enabled' if render_depth else 'disabled'}")
     
-    print("--------------------------------rendering gaussians--------------------------------")
+    print("")
+    print("rendering gaussians")
     output = decoder(gaussians, context["extrinsics"], context["intrinsics"], context["near"], context["far"], image_shape, depth_mode=depth_mode)
-    debug_output_decoder_output(output)
+    # debug_output_decoder_output(output)
     
     # Clear cache after decoder
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
         print(f"GPU memory after decoder: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
 
-    print("--------------------------------saving results--------------------------------")
+    print("")
+    print("saving results")
     save_image(output.color[0, 0], 'color256.jpg')
     print("Saved rendered color to color256.jpg")
 
