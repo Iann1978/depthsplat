@@ -29,7 +29,7 @@ class InferCfg:
     type: Literal["infer"]
     context_provider: ContextProviderCfg
     model: ModelCfg
-    dataset: DatasetCfg 
+    # dataset: DatasetCfg 
 
 @hydra.main(
     version_base=None,
@@ -37,19 +37,19 @@ class InferCfg:
     config_name="infer",
 )
 def infer(cfg_dict: DictConfig):
-    print("infer")
-    print(OmegaConf.to_yaml(cfg_dict))
+    print("--------------------------------infer--------------------------")
+    # print(OmegaConf.to_yaml(cfg_dict))
     # exit()
 
     cfg = load_typed_config(cfg_dict, InferCfg)
-    print(cfg)
+    # print(cfg)
 
-    print("get context provider")
+    print("--------------------------------get context provider--------------------------------")
     context_provider = get_context_provider(cfg.context_provider)
-    print(context_provider)
+    # print(context_provider)
 
-    print("get encoder")
-    print('cfg.model.encoder', cfg.model.encoder)
+    print("--------------------------------get encoder--------------------------------")
+    # print('cfg.model.encoder', cfg.model.encoder)
     encoder, encoder_visualizer = get_encoder(cfg.model.encoder)
     pretrained_model = torch.load('pretrained/depthsplat-gs-large-re10k-256x256-view2-e0f0f27a.pth', map_location='cpu')
     if 'state_dict' in pretrained_model:
@@ -70,48 +70,25 @@ def infer(cfg_dict: DictConfig):
     )
     encoder.eval()
     encoder.cuda()
-    print(encoder)
-    print(encoder_visualizer)
+    # print(encoder)
+    # print(encoder_visualizer)
 
-    print("get decoder")
+    print("--------------------------------get decoder--------------------------------")
     decoder = get_decoder(cfg.model.decoder, cfg.context_provider.dataset)
     decoder.eval()
     decoder.cuda()
-    print(decoder)
+    # print(decoder)
 
-    dataset = get_dataset(
-        cfg.dataset,
-        "test",
-        None,
-    )
-    # dataset = data_module.dataset_shim(dataset, "test")
-    loader = DataLoader(
-        dataset,
-        1,
-        # num_workers=cfg.data_loader.test.num_workers,
-        # generator=data_module.get_generator(cfg.data_loader.test),
-        # worker_init_fn=worker_init_fn,
-        # persistent_workers=data_module.get_persistent(cfg.data_loader.test),
-        shuffle=False,
-    )
 
-    sample = next(iter(loader))
-    debug_output_sample(sample) 
-    context = sample["context"]
-    context["image"] = context["image"].cuda()
-    context["extrinsics"] = context["extrinsics"].cuda()
-    context["intrinsics"] = context["intrinsics"].cuda()
-    context["near"] = context["near"].cuda()
-    context["far"] = context["far"].cuda()
-
-    # context = context_provider.get_context()
+    print("--------------------------------get context--------------------------------")
+    context = context_provider.get_context()
     debug_output_context(context)
     save_image(context["image"][0, 0], 'context_image0.jpg')
     save_image(context["image"][0, 1], 'context_image1.jpg')
     print("Saved context images to context_image0.jpg and context_image1.jpg")
 
 
-    print(cyan("encoding gaussians"))
+    print("--------------------------------encoding gaussians--------------------------------")
     gaussians = encoder(context, 0, False)["gaussians"]
     debug_output_gaussians(gaussians)
     
@@ -129,6 +106,7 @@ def infer(cfg_dict: DictConfig):
     depth_mode = "depth" if render_depth else None
     print(f"Depth rendering: {'enabled' if render_depth else 'disabled'}")
     
+    print("--------------------------------rendering gaussians--------------------------------")
     output = decoder(gaussians, context["extrinsics"], context["intrinsics"], context["near"], context["far"], image_shape, depth_mode=depth_mode)
     debug_output_decoder_output(output)
     
@@ -137,6 +115,7 @@ def infer(cfg_dict: DictConfig):
         torch.cuda.empty_cache()
         print(f"GPU memory after decoder: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
 
+    print("--------------------------------saving results--------------------------------")
     save_image(output.color[0, 0], 'color256.jpg')
     print("Saved rendered color to color256.jpg")
 
