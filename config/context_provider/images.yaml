@@ -1,0 +1,6 @@
+image_shape: [240, 320]
+name: images
+root_path: camsets/sets0
+debug: true
+
+
