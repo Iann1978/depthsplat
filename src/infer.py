@@ -60,6 +60,44 @@ class InferApp:
         self.views_provider = self.load_views_provider(cfg.views_provider)
         self.encoder, self.encoder_visualizer = self.load_encoder(cfg.model.encoder)
         self.decoder = self.load_decoder(cfg.model.decoder)
+        self.ui = self.load_gradio()
+
+    def load_gradio(self):
+        print("load gradio")
+        import gradio as gr
+        with gr.Blocks() as ui:
+            x = gr.State(0.0)
+            y = gr.State(0.0)
+            with gr.Row():
+                gr.Interface(self.infer,
+                    inputs=None,
+                    outputs="image")
+            with gr.Row():
+                x_display = gr.Number(value=0.0, label="x", interactive=False)
+                y_display = gr.Number(value=0.0, label="y", interactive=False)
+
+            with gr.Row():
+                btn_a = gr.Button("A")
+                btn_s = gr.Button("S")
+                btn_d = gr.Button("D")
+                btn_w = gr.Button("W")
+            
+            def increment(x):
+                x = x + 0.01
+                return x, x
+            def decrement(x):
+                x = x - 0.01
+                return x, x
+
+            ui.x = x
+            ui.y = y
+
+            btn_a.click(decrement, inputs=x, outputs=[x, x_display])
+            btn_s.click(decrement, inputs=y, outputs=[y, y_display])
+            btn_d.click(increment, inputs=x, outputs=[x, x_display])
+            btn_w.click(increment, inputs=y, outputs=[y, y_display])
+
+        return ui
 
     def load_context_provider(self, cfg: ContextProviderCfg) -> ContextProvider:
         print("load context provider")
@@ -146,13 +184,8 @@ class InferApp:
         return color
 
     def run(self):
-
-        import gradio as gr
-        demo = gr.Interface(self.infer,
-                    inputs=None,
-                    outputs="image")
-
-        demo.launch()
+        print("run")
+        self.ui.launch()
 
 
 
