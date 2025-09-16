@@ -26,6 +26,7 @@ from src.context.context_provider import ContextProvider
 from src.model.encoder import Encoder
 from src.model.decoder import Decoder
 from src.model.decoder import DecoderCfg
+from src.views import BatchedRenderViews, ViewsProviderCfg, get_views_provider, ViewsProvider
 
 def cyan(text: str) -> str:
     return f"{Fore.CYAN}{text}{Fore.RESET}"
@@ -47,6 +48,7 @@ def load_encoder_from_pretrained(encoder, pretrained_model):
 class InferCfg:
     type: Literal["infer"]
     context_provider: ContextProviderCfg
+    views_provider: ViewsProviderCfg
     model: ModelCfg
     # dataset: DatasetCfg 
 
@@ -55,12 +57,17 @@ class InferApp:
     def __init__(self, cfg: InferCfg):
         self.cfg = cfg
         self.context_provider = self.load_context_provider(cfg.context_provider)
+        self.views_provider = self.load_views_provider(cfg.views_provider)
         self.encoder, self.encoder_visualizer = self.load_encoder(cfg.model.encoder)
         self.decoder = self.load_decoder(cfg.model.decoder)
 
     def load_context_provider(self, cfg: ContextProviderCfg) -> ContextProvider:
         print("load context provider")
         return get_context_provider(cfg)
+    
+    def load_views_provider(self, cfg: ViewsProviderCfg) -> ViewsProvider:
+        print("load views provider")
+        return get_views_provider(cfg)
     
     def load_encoder(self, cfg: EncoderCfg) -> Encoder:
         print("load encoder")
@@ -104,12 +111,13 @@ class InferApp:
     def encode(self, context: BatchedViews) -> Gaussians:
         return self.encoder(context, 0, False)["gaussians"]
     
-    def decode(self, gaussians: Gaussians, context: BatchedViews):
+    def decode(self, gaussians: Gaussians, views: BatchedRenderViews):
         print("")
         print("rendering gaussians")
         image_shape = (256, 256)  # Reduced from (256, 256)
         print(f"Using image shape: {image_shape}")
-        output = self.decoder(gaussians, context["extrinsics"], context["intrinsics"], context["near"], context["far"], image_shape, depth_mode=None)
+
+        output = self.decoder(gaussians, views["extrinsics"], views["intrinsics"], views["near"], views["far"], image_shape, depth_mode=None)
         # debug_output_decoder_output(output)
         
         # Clear cache after decoder
@@ -125,8 +133,15 @@ class InferApp:
     
     def infer(self):
         context = self.load_context()
+        # views = BatchedRenderViews(
+        #     extrinsics=context["extrinsics"],
+        #     intrinsics=context["intrinsics"],
+        #     near=context["near"],
+        #     far=context["far"],
+        # )
+        views = self.views_provider.get_views()
         gaussians = self.encode(context)
-        color = self.decode(gaussians, context)
+        color = self.decode(gaussians, views)
         color = color.permute(1, 2, 0).detach().cpu().numpy()
         return color
 
