@@ -20,6 +20,12 @@ from torch.utils.data import DataLoader
 from src.dataset.data_module import get_dataset, worker_init_fn
 from src.dataset.types import debug_output_sample
 from src.dataset import DatasetCfg
+from src.model.types import Gaussians
+from src.dataset.types import BatchedViews
+from src.context.context_provider import ContextProvider
+from src.model.encoder import Encoder
+from src.model.decoder import Decoder
+from src.model.decoder import DecoderCfg
 
 def cyan(text: str) -> str:
     return f"{Fore.CYAN}{text}{Fore.RESET}"
@@ -44,6 +50,84 @@ class InferCfg:
     model: ModelCfg
     # dataset: DatasetCfg 
 
+
+class InferApp:
+    def __init__(self, cfg: InferCfg):
+        self.cfg = cfg
+        self.context_provider = self.load_context_provider(cfg.context_provider)
+        self.encoder, self.encoder_visualizer = self.load_encoder(cfg.model.encoder)
+        self.decoder = self.load_decoder(cfg.model.decoder)
+
+    def load_context_provider(self, cfg: ContextProviderCfg) -> ContextProvider:
+        print("load context provider")
+        return get_context_provider(cfg)
+    
+    def load_encoder(self, cfg: EncoderCfg) -> Encoder:
+        print("load encoder")
+        encoder, encoder_visualizer = get_encoder(cfg)
+        encoder = load_encoder_from_pretrained(encoder, 'pretrained/depthsplat-gs-large-re10k-256x256-view2-e0f0f27a.pth')
+        print(cyan(f"Loaded pretrained weights: pretrained/depthsplat-gs-large-re10k-256x256-view2-e0f0f27a.pth"))
+        encoder.eval()
+        encoder.cuda()
+        return encoder, encoder_visualizer
+    
+    def load_decoder(self, cfg: DecoderCfg) -> Decoder:
+        print("load decoder")
+        background_color = [0.0, 0.0, 0.0]
+        decoder = get_decoder(cfg, background_color)
+        decoder.eval()
+        decoder.cuda()
+        return decoder
+
+    def load_context(self) -> BatchedViews:
+        print("load context")
+        context = self.context_provider.get_context()
+        debug_output_context(context)
+        save_image(context["image"][0, 0], 'context_image0.jpg')
+        save_image(context["image"][0, 1], 'context_image1.jpg')
+        print("Saved context images to context_image0.jpg and context_image1.jpg")
+        # Move context data to GPU before passing to encoder
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        context = {
+            "extrinsics": context["extrinsics"].to(device),
+            "intrinsics": context["intrinsics"].to(device),
+            "image": context["image"].to(device),
+            "near": context["near"].to(device),
+            "far": context["far"].to(device),
+            "index": context["index"].to(device),
+        }
+        print(f"Moved context data to device: {device}")
+        return context
+    
+
+    
+    def encode(self, context: BatchedViews) -> Gaussians:
+        return self.encoder(context, 0, False)["gaussians"]
+    
+    def decode(self, gaussians: Gaussians, context: BatchedViews):
+        print("")
+        print("rendering gaussians")
+        image_shape = (256, 256)  # Reduced from (256, 256)
+        print(f"Using image shape: {image_shape}")
+        output = self.decoder(gaussians, context["extrinsics"], context["intrinsics"], context["near"], context["far"], image_shape, depth_mode=None)
+        # debug_output_decoder_output(output)
+        
+        # Clear cache after decoder
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            print(f"GPU memory after decoder: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
+
+        print("")
+        print("saving results")
+        save_image(output.color[0, 0], 'color256.jpg')
+        print("Saved rendered color to color256.jpg")
+    
+    def run(self):
+        context = self.load_context()
+        gaussians = self.encode(context)
+        self.decode(gaussians, context)
+
+
 @hydra.main(
     version_base=None,
     config_path="../config",
@@ -55,88 +139,14 @@ def infer(cfg_dict: DictConfig):
     # exit()
 
     cfg = load_typed_config(cfg_dict, InferCfg)
-    # print(cfg)
 
-    print("")
-    print("get context provider")
-    context_provider = get_context_provider(cfg.context_provider)
-    # print(context_provider)
-
-    print("")
-    print("get encoder")
-    # print('cfg.model.encoder', cfg.model.encoder)
-    encoder, encoder_visualizer = get_encoder(cfg.model.encoder)
-    encoder = load_encoder_from_pretrained(encoder, 'pretrained/depthsplat-gs-large-re10k-256x256-view2-e0f0f27a.pth')
-    print(cyan(f"Loaded pretrained weights: pretrained/depthsplat-gs-large-re10k-256x256-view2-e0f0f27a.pth"))
-    encoder.eval()
-    encoder.cuda()
-    # print(encoder)
-    # print(encoder_visualizer)
-
-    print("")
-    print("get decoder")
-    background_color = [0.0, 0.0, 0.0]
-    decoder = get_decoder(cfg.model.decoder, background_color)
-    decoder.eval()
-    decoder.cuda()
-    # print(decoder)
+    app = InferApp(cfg)
+    app.run()
+    exit()
 
 
-    print("")
-    print("get context")
-    context = context_provider.get_context()
-    debug_output_context(context)
-    save_image(context["image"][0, 0], 'context_image0.jpg')
-    save_image(context["image"][0, 1], 'context_image1.jpg')
-    print("Saved context images to context_image0.jpg and context_image1.jpg")
 
 
-    print("")
-    print("encoding gaussians")
-    
-    # Move context data to GPU before passing to encoder
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    context = {
-        "extrinsics": context["extrinsics"].to(device),
-        "intrinsics": context["intrinsics"].to(device),
-        "image": context["image"].to(device),
-        "near": context["near"].to(device),
-        "far": context["far"].to(device),
-        "index": context["index"].to(device),
-    }
-    print(f"Moved context data to device: {device}")
-    
-    gaussians = encoder(context, 0, False)["gaussians"]
-    # debug_output_gaussians(gaussians)
-    
-    # Clear cache after encoder
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-        print(f"GPU memory after encoder: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
-
-    # Use smaller image size to reduce memory usage
-    image_shape = (256, 256)  # Reduced from (256, 256)
-    print(f"Using image shape: {image_shape}")
-    
-    # Option to skip depth rendering if memory is tight
-    render_depth = False  # Set to False if you want to skip depth rendering
-    depth_mode = "depth" if render_depth else None
-    print(f"Depth rendering: {'enabled' if render_depth else 'disabled'}")
-    
-    print("")
-    print("rendering gaussians")
-    output = decoder(gaussians, context["extrinsics"], context["intrinsics"], context["near"], context["far"], image_shape, depth_mode=depth_mode)
-    # debug_output_decoder_output(output)
-    
-    # Clear cache after decoder
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-        print(f"GPU memory after decoder: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
-
-    print("")
-    print("saving results")
-    save_image(output.color[0, 0], 'color256.jpg')
-    print("Saved rendered color to color256.jpg")
 
 
 if __name__ == "__main__":
