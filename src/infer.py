@@ -121,11 +121,24 @@ class InferApp:
         print("saving results")
         save_image(output.color[0, 0], 'color256.jpg')
         print("Saved rendered color to color256.jpg")
+        return output.color[0, 0]
     
-    def run(self):
+    def infer(self):
         context = self.load_context()
         gaussians = self.encode(context)
-        self.decode(gaussians, context)
+        color = self.decode(gaussians, context)
+        color = color.permute(1, 2, 0).detach().cpu().numpy()
+        return color
+
+    def run(self):
+
+        import gradio as gr
+        demo = gr.Interface(self.infer,
+                    inputs=None,
+                    outputs="image")
+
+        demo.launch()
+
 
 
 @hydra.main(
