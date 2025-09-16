@@ -56,18 +56,19 @@ class InferCfg:
 class InferApp:
     def __init__(self, cfg: InferCfg):
         self.cfg = cfg
+        self.ui = self.load_gradio()
         self.context_provider = self.load_context_provider(cfg.context_provider)
         self.views_provider = self.load_views_provider(cfg.views_provider)
         self.encoder, self.encoder_visualizer = self.load_encoder(cfg.model.encoder)
         self.decoder = self.load_decoder(cfg.model.decoder)
-        self.ui = self.load_gradio()
+
 
     def load_gradio(self):
         print("load gradio")
         import gradio as gr
         with gr.Blocks() as ui:
-            x = gr.State(0.0)
-            y = gr.State(0.0)
+            state_x = gr.State(0.0)
+            state_y = gr.State(0.0)
             with gr.Row():
                 gr.Interface(self.infer,
                     inputs=None,
@@ -82,20 +83,32 @@ class InferApp:
                 btn_d = gr.Button("D")
                 btn_w = gr.Button("W")
             
-            def increment(x):
+            def increment_x(x):
                 x = x + 0.01
+                ui.x = x
                 return x, x
-            def decrement(x):
+            def decrement_x(x):
                 x = x - 0.01
+                ui.x = x
                 return x, x
 
-            ui.x = x
-            ui.y = y
+            def increment_y(y):
+                y = y + 0.01
+                ui.y = y
+                return y, y
+            def decrement_y(y):
+                y = y - 0.01
+                ui.y = y
+                return y, y
 
-            btn_a.click(decrement, inputs=x, outputs=[x, x_display])
-            btn_s.click(decrement, inputs=y, outputs=[y, y_display])
-            btn_d.click(increment, inputs=x, outputs=[x, x_display])
-            btn_w.click(increment, inputs=y, outputs=[y, y_display])
+            ui.x = state_x.value
+            ui.y = state_y.value
+
+
+            btn_a.click(decrement_x, inputs=state_x, outputs=[state_x, x_display])
+            btn_s.click(decrement_y, inputs=state_y, outputs=[state_y, y_display])
+            btn_d.click(increment_x, inputs=state_x, outputs=[state_x, x_display])
+            btn_w.click(increment_y, inputs=state_y, outputs=[state_y, y_display])
 
         return ui
 
@@ -105,7 +118,7 @@ class InferApp:
     
     def load_views_provider(self, cfg: ViewsProviderCfg) -> ViewsProvider:
         print("load views provider")
-        return get_views_provider(cfg)
+        return get_views_provider(cfg, ui=self.ui)
     
     def load_encoder(self, cfg: EncoderCfg) -> Encoder:
         print("load encoder")
@@ -170,6 +183,8 @@ class InferApp:
         return output.color[0, 0]
     
     def infer(self):
+        print("x:", self.ui.x)
+        print("y:", self.ui.y)
         context = self.load_context()
         # views = BatchedRenderViews(
         #     extrinsics=context["extrinsics"],

@@ -19,9 +19,11 @@ class ViewsProviderCfgCommon:
 
 class ViewsProvider(ABC, Generic[T]):
     cfg: T
+    kwargs: dict
 
-    def __init__(self, cfg: T) -> None:
+    def __init__(self, cfg: T, **kwargs) -> None:
         self.cfg = cfg
+        self.kwargs = kwargs
 
     @abstractmethod
     def get_views(self) -> BatchedRenderViews:

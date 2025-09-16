@@ -1,6 +1,6 @@
 defaults:
   - context_provider: images
-  - views_provider: fixed
+  - views_provider: gradio
   - model/encoder: depthsplat
   - model/decoder: splatting_cuda
 
